@@ -13,5 +13,5 @@ script:
 notifications:
   email:
     recipients:
-      - avdayan@bgu.ac.il
+      - dvirbox@gmail.com
     on_failure: always
