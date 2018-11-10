@@ -4,7 +4,7 @@ import * as esprima from 'esprima';
 export {parseCode, resolveElements};
 
 const parseCode = (codeToParse) => {
-    console.log(esprima.parseScript(codeToParse, { loc: true }));
+    // console.log(esprima.parseScript(codeToParse, { loc: true }));
     return esprima.parseScript(codeToParse,{ loc: true });
 };
 
