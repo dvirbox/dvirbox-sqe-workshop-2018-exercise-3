@@ -8,16 +8,6 @@ const parseCode = (codeToParse) => {
     return esprima.parseScript(codeToParse,{ loc: true });
 };
 
-// const parseCode = (codeToParse) => {
-//     console.log(esprima.parseScript(codeToParse, { loc: true }, function (node) {
-//         return node.type;
-//     }));
-//     esprima.parseScript(codeToParse,{ loc: true }, function (node) {
-//         toRet.push({type: node.type,line: node.loc.start.line, name: node.id? node.id.name : ''});
-//     });
-//     return toRet;
-// };
-
 function generateResolvedElement(line, type, name='', condition='', value=''){
     return {line: line, type: type, name: name, condition: condition, value: value};
 }
@@ -84,10 +74,13 @@ function resolveIfStatement(parsedIfStatement, isElseIf) {
     const test = resolveBinaryExpression(parsedIfStatement.test);
     const ifStatement = generateResolvedElement(line, type, undefined, test);
     const body = resolveElements(parsedIfStatement.consequent);
-    const alternate = (parsedIfStatement.alternate.type === 'IfStatement') ?
-        resolveIfStatement(parsedIfStatement.alternate, /*isElseIf*/ true) :
-        resolveElements(parsedIfStatement.alternate);
-    return [].concat(ifStatement,body,alternate);
+    if (parsedIfStatement.alternate) { /**if else statements flow**/
+        const alternate = (parsedIfStatement.alternate.type === 'IfStatement') ?
+            resolveIfStatement(parsedIfStatement.alternate, /*isElseIf*/ true) :
+            resolveElements(parsedIfStatement.alternate);
+        return [].concat(ifStatement,body,alternate);
+    }
+    return [].concat(ifStatement,body); /**if statement flow**/
 }
 
 function resolveReturnStatement(parsedReturnStatement) {
@@ -127,36 +120,40 @@ function resolveThisExpression() {
 }
 
 function resolveElements(parsedCode){
-    switch (parsedCode.type) {
-        case 'Program':
-            return resolveElements(parsedCode.body[0]);
-        case 'AssignmentExpression':
-            return resolveAssignmentExpression(parsedCode);
-        case 'BinaryExpression':
-            return resolveBinaryExpression(parsedCode);
-        case 'BlockStatement':
-            return resolveBlockStatement(parsedCode.body);
-        case 'ExpressionStatement':
-            return resolveElements(parsedCode.expression);
-        case 'FunctionDeclaration':
-            return resolveFunction(parsedCode);
-        case 'Identifier':
-            return resolveIdentifier(parsedCode);
-        case 'IfStatement':
-            return resolveIfStatement(parsedCode, /*isElseIf*/ false);
-        case 'Literal':
-            return resolveLiteral(parsedCode);
-        case 'MemberExpression':
-            return resolveMemberExpression(parsedCode);
-        case 'ReturnStatement':
-            return resolveReturnStatement(parsedCode);
-        case 'ThisExpression':
-            return resolveThisExpression();
-        case 'UnaryExpression':
-            return resolveUnaryExpression(parsedCode);
-        case 'VariableDeclaration':
-            return resolveVariableDeclaration(parsedCode.declarations);
-        case 'WhileStatement':
-            return resolveWhileStatement(parsedCode);
+    if(parsedCode){
+        switch (parsedCode.type) {
+            case 'Program':
+                return resolveElements(parsedCode.body[0]);
+            case 'AssignmentExpression':
+                return resolveAssignmentExpression(parsedCode);
+            case 'BinaryExpression':
+                return resolveBinaryExpression(parsedCode);
+            case 'BlockStatement':
+                return resolveBlockStatement(parsedCode.body);
+            case 'ExpressionStatement':
+                return resolveElements(parsedCode.expression);
+            case 'FunctionDeclaration':
+                return resolveFunction(parsedCode);
+            case 'Identifier':
+                return resolveIdentifier(parsedCode);
+            case 'IfStatement':
+                return resolveIfStatement(parsedCode, /*isElseIf*/ false);
+            case 'Literal':
+                return resolveLiteral(parsedCode);
+            case 'MemberExpression':
+                return resolveMemberExpression(parsedCode);
+            case 'ReturnStatement':
+                return resolveReturnStatement(parsedCode);
+            case 'ThisExpression':
+                return resolveThisExpression();
+            case 'UnaryExpression':
+                return resolveUnaryExpression(parsedCode);
+            case 'VariableDeclaration':
+                return resolveVariableDeclaration(parsedCode.declarations);
+            case 'WhileStatement':
+                return resolveWhileStatement(parsedCode);
+        }
     }
+    return ''; /**Maybe Throw Exception**/
+
 }
