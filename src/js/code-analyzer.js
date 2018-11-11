@@ -26,7 +26,7 @@ function resolveFunction(parsedFunction) {
     const line = parsedFunction.loc.start.line;
     const type ='FunctionDeclaration';
     const name = resolveElements(parsedFunction.id);
-    const functionDeclaration = generateResolvedElement(line, type, name);//{line: line, type: 'FunctionDeclaration', name: name};
+    const functionDeclaration = generateResolvedElement(line, type, name);
     const paramRes = resolveParams(parsedFunction.params);
     const bodyRes = resolveElements(parsedFunction.body);
     return [].concat(functionDeclaration,paramRes,bodyRes);
@@ -37,7 +37,7 @@ function resolveParams(params) {
         const line = param.loc.start.line;
         const type = 'VariableDeclaration';
         const name = resolveElements(param);
-        return generateResolvedElement(line, type, name);});//{line: param.loc.start.line, type: 'VariableDeclaration', name: param.name}));
+        return generateResolvedElement(line, type, name);});
 }
 
 function resolveBlockStatement(parsedBlockStatements) {
@@ -50,7 +50,7 @@ function resolveVariableDeclaration(parsedDeclarations) {
         const line = declaration.loc.start.line;
         const type = 'VariableDeclaration';
         const name = resolveElements(declaration.id);
-        return generateResolvedElement(line, type, name);});//({line: declaration.loc.start.line, type: 'VariableDeclaration', name: resolveElements(declaration.id)}));
+        return generateResolvedElement(line, type, name);});
 }
 
 function resolveAssignmentExpression(parsedAssignmentExpression) {
@@ -58,7 +58,7 @@ function resolveAssignmentExpression(parsedAssignmentExpression) {
     const type = 'AssignmentExpression';
     const name = resolveElements(parsedAssignmentExpression.left);
     const value = resolveElements(parsedAssignmentExpression.right);
-    return generateResolvedElement(line, type, name, undefined, value);//{line: line, type: 'AssignmentExpression', name: name, value: value};
+    return generateResolvedElement(line, type, name, undefined, value);
 }
 
 function resolveBinaryExpression(parsedBinaryExpression) {
@@ -72,7 +72,7 @@ function resolveWhileStatement(parsedWhileStatement) {
     const line = parsedWhileStatement.loc.start.line;
     const type = 'WhileStatement';
     const test = resolveBinaryExpression(parsedWhileStatement.test);
-    const whileStatement = generateResolvedElement(line, type, undefined, test);//{line: parsedWhileStatement.loc.start.line, type: 'WhileStatement',cond: test};
+    const whileStatement = generateResolvedElement(line, type, undefined, test);
     const body = resolveElements(parsedWhileStatement.body);
     return [].concat(whileStatement,body);
 }
@@ -82,10 +82,10 @@ function resolveIfStatement(parsedIfStatement, isElseIf) {
     const line = parsedIfStatement.loc.start.line;
     const type = generateIfType(isElseIf);
     const test = resolveBinaryExpression(parsedIfStatement.test);
-    const ifStatement = generateResolvedElement(line, type, undefined,test);//{line: parsedIfStatement.loc.start.line, type: generateIfType(isElseIf), cond: test};
+    const ifStatement = generateResolvedElement(line, type, undefined, test);
     const body = resolveElements(parsedIfStatement.consequent);
     const alternate = (parsedIfStatement.alternate.type === 'IfStatement') ?
-        resolveIfStatement(parsedIfStatement.alternate, /*isElseIf*/true) :
+        resolveIfStatement(parsedIfStatement.alternate, /*isElseIf*/ true) :
         resolveElements(parsedIfStatement.alternate);
     return [].concat(ifStatement,body,alternate);
 }
@@ -94,7 +94,7 @@ function resolveReturnStatement(parsedReturnStatement) {
     const line = parsedReturnStatement.loc.start.line;
     const value = resolveElements(parsedReturnStatement.argument);
     const type ='ReturnStatement';
-    return generateResolvedElement(line, type, undefined, undefined,value);//{line: line, type: 'ReturnStatement', value: value};
+    return generateResolvedElement(line, type, undefined, undefined, value);
 }
 
 function resolveIdentifier(parsedIdentifier) {
@@ -108,7 +108,12 @@ function resolveLiteral(parsedLiteral) {
 function resolveMemberExpression(parsedMemberExpression) {
     const object = resolveElements(parsedMemberExpression.object);
     const property = resolveElements(parsedMemberExpression.property);
-    return object + '[' + property + ']';
+    switch (parsedMemberExpression.object.type){
+        case 'Identifier':
+            return object + '[' + property + ']';
+        case 'ThisExpression':
+            return resolveThisExpression() + property;
+    }
 }
 
 function resolveUnaryExpression(parsedUnaryExpression) {
@@ -117,35 +122,41 @@ function resolveUnaryExpression(parsedUnaryExpression) {
     return operator + value;
 }
 
+function resolveThisExpression() {
+    return 'this.';
+}
+
 function resolveElements(parsedCode){
     switch (parsedCode.type) {
         case 'Program':
             return resolveElements(parsedCode.body[0]);
-        case 'FunctionDeclaration':
-            return resolveFunction(parsedCode);
-        case 'BlockStatement':
-            return resolveBlockStatement(parsedCode.body);
-        case 'VariableDeclaration':
-            return resolveVariableDeclaration(parsedCode.declarations);
-        case 'ExpressionStatement':
-            return resolveElements(parsedCode.expression);
         case 'AssignmentExpression':
             return resolveAssignmentExpression(parsedCode);
-        case 'WhileStatement':
-            return resolveWhileStatement(parsedCode);
-        case 'IfStatement':
-            return resolveIfStatement(parsedCode, /*isElseIf*/false);
-        case 'ReturnStatement':
-            return resolveReturnStatement(parsedCode);
-        case 'Identifier':
-            return resolveIdentifier(parsedCode);
-        case 'Literal':
-            return resolveLiteral(parsedCode);
         case 'BinaryExpression':
             return resolveBinaryExpression(parsedCode);
+        case 'BlockStatement':
+            return resolveBlockStatement(parsedCode.body);
+        case 'ExpressionStatement':
+            return resolveElements(parsedCode.expression);
+        case 'FunctionDeclaration':
+            return resolveFunction(parsedCode);
+        case 'Identifier':
+            return resolveIdentifier(parsedCode);
+        case 'IfStatement':
+            return resolveIfStatement(parsedCode, /*isElseIf*/ false);
+        case 'Literal':
+            return resolveLiteral(parsedCode);
         case 'MemberExpression':
             return resolveMemberExpression(parsedCode);
+        case 'ReturnStatement':
+            return resolveReturnStatement(parsedCode);
+        case 'ThisExpression':
+            return resolveThisExpression();
         case 'UnaryExpression':
             return resolveUnaryExpression(parsedCode);
+        case 'VariableDeclaration':
+            return resolveVariableDeclaration(parsedCode.declarations);
+        case 'WhileStatement':
+            return resolveWhileStatement(parsedCode);
     }
 }
