@@ -1,11 +1,12 @@
 
+
 import $ from 'jquery';
 import {resolveCode} from './code-analyzer';
 
 $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
-        let codeToParse = $('#codePlaceholder').val();
-        let resolvedCode = resolveCode(codeToParse); /*This is the module*/
+        let codeToResolve = $('#codePlaceholder').val();
+        let resolvedCode = resolveCode(codeToResolve); /*This is the module*/
         let html = generateTableHeader();
 
         for (let i = 0; i < resolvedCode.length; i++) {

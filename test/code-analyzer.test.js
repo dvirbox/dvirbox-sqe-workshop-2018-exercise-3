@@ -1,4 +1,5 @@
-/* eslint-disable no-console,max-lines-per-function */
+/* eslint-disable max-lines-per-function */
+
 import assert from 'assert';
 import {parseCode, resolveCode} from '../src/js/code-analyzer';
 
@@ -11,14 +12,14 @@ describe('The javascript parser', () => {
         );
     });
 
-    it('is parsing a simple variable declaration correctly', () => {
+    it('is parsing a simple variable declaration incorrectly', () => {
         assert.equal(
             JSON.stringify(parseCode('let a = 1;')),
             '{"type":"Program","body":[{"type":"VariableDeclaration","declarations":[{"type":"VariableDeclarator","id":{"type":"Identifier","name":"a","range":[4,5],"loc":{"start":{"line":1,"column":4},"end":{"line":1,"column":5}}},"init":{"type":"Literal","value":1,"raw":"1","range":[8,9],"loc":{"start":{"line":1,"column":8},"end":{"line":1,"column":9}}},"range":[4,9],"loc":{"start":{"line":1,"column":4},"end":{"line":1,"column":9}}}],"kind":"let","range":[0,10],"loc":{"start":{"line":1,"column":0},"end":{"line":1,"column":10}}}],"sourceType":"script","range":[0,10],"loc":{"start":{"line":1,"column":0},"end":{"line":1,"column":10}}}'
         );
     });
 
-    it('is parsing a simple variable declaration correctly', () => {
+    it('is parsing assignment example incorrectly', () => {
         assert.equal(
             JSON.stringify(parseCode('function binarySearch(X, V, n){\n' +
                 '    let low, high, mid;\n' +
@@ -40,8 +41,8 @@ describe('The javascript parser', () => {
     });
 });
 
-describe('The javascript resolver', () => {
-    it('is parsing an empty function correctly', () => {
+describe('The resolver', () => {
+    it('is resolving an basic function with single return statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'return \'\';\n' +
             '}';
@@ -51,7 +52,7 @@ describe('The javascript resolver', () => {
         );
     });
 
-    it('is parsing an Example function correctly', () => {
+    it('is resolving the assignment example input incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             '    let low, high, mid;\n' +
             '    low = 0;\n' +
@@ -69,11 +70,11 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"binarySearch","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"X","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"V","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"n","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"low","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"high","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"mid","condition":"","value":""},{"line":3,"type":"AssignmentExpression","name":"low","condition":"","value":"0"},{"line":4,"type":"AssignmentExpression","name":"high","condition":"","value":"n - 1"},{"line":5,"type":"WhileStatement","name":"","condition":"low <= high","value":""},{"line":6,"type":"AssignmentExpression","name":"mid","condition":"","value":"(low + high)/2"},{"line":7,"type":"IfStatement","name":"","condition":"X < V[mid]","value":""},{"line":8,"type":"AssignmentExpression","name":"high","condition":"","value":"mid - 1"},{"line":9,"type":"ElseIfStatement","name":"","condition":"X > V[mid]","value":""},{"line":10,"type":"AssignmentExpression","name":"low","condition":"","value":"mid + 1"},{"line":12,"type":"ReturnStatement","name":"","condition":"","value":"mid"},{"line":14,"type":"ReturnStatement","name":"","condition":"","value":"-1"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"binarySearch","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"X","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"V","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"n","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"low","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"high","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"mid","condition":"","value":""},{"line":3,"type":"AssignmentExpression","name":"low","condition":"","value":"0"},{"line":4,"type":"AssignmentExpression","name":"high","condition":"","value":"n - 1"},{"line":5,"type":"WhileStatement","name":"","condition":"low <= high","value":""},{"line":6,"type":"AssignmentExpression","name":"mid","condition":"","value":"(low + high) / 2"},{"line":7,"type":"IfStatement","name":"","condition":"X < V[mid]","value":""},{"line":8,"type":"AssignmentExpression","name":"high","condition":"","value":"mid - 1"},{"line":9,"type":"ElseIfStatement","name":"","condition":"X > V[mid]","value":""},{"line":10,"type":"AssignmentExpression","name":"low","condition":"","value":"mid + 1"},{"line":12,"type":"ReturnStatement","name":"","condition":"","value":"mid"},{"line":14,"type":"ReturnStatement","name":"","condition":"","value":"-1"}]'
         );
     });
 
-    it('is parsing an function with if statement correctly', () => {
+    it('is resolving an function with if without else statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'if (X < V[mid])\n' +
             'return high = mid - 1;\n' +
@@ -84,7 +85,7 @@ describe('The javascript resolver', () => {
         );
     });
 
-    it('is parsing an function with if else statement correctly', () => {
+    it('is resolving an function with if-else statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'if (X < V[mid])\n' +
             'return high = mid - 1;\n' +
@@ -98,7 +99,7 @@ describe('The javascript resolver', () => {
         );
     });
 
-    it('is parsing an function with if, else if statement correctly', () => {
+    it('is resolving an function with if-elseif without else statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'if (X < V[mid])\n' +
             'return high = mid - 1;\n' +
@@ -113,7 +114,7 @@ describe('The javascript resolver', () => {
         );
     });
 
-    it('is parsing an function with if, else if, else statement correctly', () => {
+    it('is resolving an function with if-elseif-else statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'if (X < V[mid])\n' +
             'return high = mid - 1;\n' +
@@ -130,7 +131,7 @@ describe('The javascript resolver', () => {
         );
     });
 
-    it('is parsing an function with .this statement correctly', () => {
+    it('is resolving an function with .this statement incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'let low, high, mid;\n' +
             'low = 0;\n' +
@@ -148,18 +149,18 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"binarySearch","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"X","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"V","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"n","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"low","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"high","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"mid","condition":"","value":""},{"line":3,"type":"AssignmentExpression","name":"low","condition":"","value":"0"},{"line":4,"type":"AssignmentExpression","name":"high","condition":"","value":"n - 1"},{"line":5,"type":"WhileStatement","name":"","condition":"low <= high","value":""},{"line":6,"type":"AssignmentExpression","name":"mid","condition":"","value":"(low + high)/2"},{"line":7,"type":"IfStatement","name":"","condition":"X < V[mid]","value":""},{"line":8,"type":"AssignmentExpression","name":"high","condition":"","value":"mid - 1"},{"line":9,"type":"ElseIfStatement","name":"","condition":"X > V[mid]","value":""},{"line":10,"type":"AssignmentExpression","name":"low","condition":"","value":"mid + 1"},{"line":12,"type":"ReturnStatement","name":"","condition":"","value":"this.mid"},{"line":14,"type":"ReturnStatement","name":"","condition":"","value":"-1"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"binarySearch","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"X","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"V","condition":"","value":""},{"line":1,"type":"VariableDeclaration","name":"n","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"low","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"high","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"mid","condition":"","value":""},{"line":3,"type":"AssignmentExpression","name":"low","condition":"","value":"0"},{"line":4,"type":"AssignmentExpression","name":"high","condition":"","value":"n - 1"},{"line":5,"type":"WhileStatement","name":"","condition":"low <= high","value":""},{"line":6,"type":"AssignmentExpression","name":"mid","condition":"","value":"(low + high) / 2"},{"line":7,"type":"IfStatement","name":"","condition":"X < V[mid]","value":""},{"line":8,"type":"AssignmentExpression","name":"high","condition":"","value":"mid - 1"},{"line":9,"type":"ElseIfStatement","name":"","condition":"X > V[mid]","value":""},{"line":10,"type":"AssignmentExpression","name":"low","condition":"","value":"mid + 1"},{"line":12,"type":"ReturnStatement","name":"","condition":"","value":"this.mid"},{"line":14,"type":"ReturnStatement","name":"","condition":"","value":"-1"}]'
         );
     });
 
-    it('is resolving invalid input', () => {
+    it('is resolving invalid input incorrectly', () => {
         assert.equal(
             JSON.stringify(resolveCode('{type: \'notExistingType\'}')),
             '[""]'
         );
     });
 
-    it('for loop with assignmentExpression update', () => {
+    it('is resolving for loop with (assignment expression) update incorrectly', () => {
         assert.equal(
             JSON.stringify(resolveCode('function test(){\n' +
                 'let x = 3;\n' +
@@ -168,11 +169,11 @@ describe('The javascript resolver', () => {
                 '}\n' +
                 'return x;\n' +
                 '}')),
-            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i=0; i<=5; i=i+1","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x+i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i = 0; i <= 5; i = i + 1","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x + i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
         );
     });
 
-    it('for loop with prefix (i++) update', () => {
+    it('is resolving for loop with prefix (i++) update incorrectly', () => {
         let code = 'function test(){\n' +
             'let x = 3;\n' +
             'for(i=0;i<=5;i++){\n' +
@@ -182,11 +183,11 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i=0; i<=5; i++","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x+i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i = 0; i <= 5; i++","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x + i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
         );
     });
 
-    it('for loop with prefix (i++) update', () => {
+    it('is resolving for loop with infix (++i) update incorrectly', () => {
         let code = 'function test(){\n' +
             'let x = 3;\n' +
             'for(i=0;i<=5;++i){\n' +
@@ -196,11 +197,11 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i=0; i<=5; ++i","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x+i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"i = 0; i <= 5; ++i","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x + i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
         );
     });
 
-    it('for loop with prefix (i++) update', () => {
+    it('is resolving for loop with (var in array) update notation incorrectly', () => {
         let code = 'function test(){\n' +
             'let x = 3;\n' +
             'for(x in low){\n' +
@@ -210,11 +211,11 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForInStatement","name":"","condition":"x in low","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x+i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForInStatement","name":"","condition":"x in low","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x + i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
         );
     });
 
-    it('for loop with (;;) condition update', () => {
+    it('is resolving for loop with (;;) condition notation incorrectly', () => {
         let code = 'function test(){\n' +
             'let x = 3;\n' +
             'for(;;){\n' +
@@ -224,11 +225,11 @@ describe('The javascript resolver', () => {
             '}';
         assert.equal(
             JSON.stringify(resolveCode(code)),
-            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"; ; ","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x+i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
+            '[{"line":1,"type":"FunctionDeclaration","name":"test","condition":"","value":""},{"line":2,"type":"VariableDeclaration","name":"x","condition":"","value":"3"},{"line":3,"type":"ForStatement","name":"","condition":"; ; ","value":""},{"line":4,"type":"AssignmentExpression","name":"x","condition":"","value":"x + i"},{"line":6,"type":"ReturnStatement","name":"","condition":"","value":"x"}]'
         );
     });
 
-    it('for loop with (;;) condition update', () => {
+    it('is resolving for loop with (; condition) condition notation incorrectly', () => {
         let code = 'function binarySearch(X, V, n){\n' +
             'let i = 0;\n' +
             'let len = cars.length;\n' +

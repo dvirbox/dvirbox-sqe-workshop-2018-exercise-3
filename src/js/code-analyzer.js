@@ -1,5 +1,6 @@
 
 import * as esprima from 'esprima';
+import * as escodegen from 'escodegen';
 
 export {parseCode, resolveCode};
 
@@ -105,82 +106,18 @@ function resolveForStatement(parsedForStatement){
     return [].concat(forStatement, body);
 }
 
-// function resolveIdentifier(parsedIdentifier) {
-//     return parsedIdentifier.name;
-// }
-//
-// function resolveLiteral(parsedLiteral) {
-//     return parsedLiteral.value;
-// }
-//
-// function resolveMemberExpression(parsedMemberExpression) {
-//     const object = resolveExpression(parsedMemberExpression.object);
-//     const property = resolveExpression(parsedMemberExpression.property);
-//     switch (parsedMemberExpression.object.type){
-//         case 'Identifier':
-//             return object + '[' + property + ']';
-//         case 'ThisExpression':
-//             return resolveThisExpression() + property;
-//     }
-// }
-//
-// function resolveUnaryExpression(parsedUnaryExpression) {
-//     const value = resolveExpression(parsedUnaryExpression.argument);
-//     const operator = parsedUnaryExpression.operator;
-//     return operator + ' ' + value;
-// }
-//
-// function resolveThisExpression() {
-//     return 'this.';
-// }
-
-// function resolveBinaryExpression(parsedBinaryExpression) {
-//     const operator = parsedBinaryExpression.operator ;
-//     const left = resolveExpression(parsedBinaryExpression.left);
-//     const right = resolveExpression(parsedBinaryExpression.right);
-//     return '' + left + ' ' + operator + ' ' + right;
-// }
-
-//
 function resolveUpdateExpression(parsedUpdateExpression){
     const line = parsedUpdateExpression.loc.start.line;
     const type = 'AssignmentExpression';
     const value = resolveExpression(parsedUpdateExpression);
     return generateResolvedElement(line, type, undefined, undefined, value);
 }
-//
-// function resolveConditionalExpression(parsedConditionalExpression){
-//     const test = resolveExpression(parsedConditionalExpression.test);
-//     const consequent = resolveExpression(parsedConditionalExpression.consequent);
-//     const alternate = resolveExpression(parsedConditionalExpression.alternate);
-//     return test + ' ? ' + consequent + ' : ' + alternate;
-// }
-//
-// function resolveVariableDeclarationExpression(parsedDeclarationExpressions){
-//     const kind = parsedDeclarationExpressions.kind;
-//     const reducer = (acc, decelerator) => {return acc + kind + ' ' + resolveExpression(decelerator.id) + ' = ' + resolveExpression(decelerator.init) + ', ';};
-//     const decelerations = parsedDeclarationExpressions.declarations.reduce(reducer,'');
-//     return decelerations.slice(0, -2);
-// }
-
 
 function resolveExpression(parsedCode){
-    return parsedCode ? codeString.substring(parsedCode.range[0],parsedCode.range[1]): '';
+    return parsedCode ? escodegen.generate(parsedCode) : '';
+    // return parsedCode ? codeString.substring(parsedCode.range[0],parsedCode.range[1]): '';
 }
-// const typeToResolverMapping = {
-//     BinaryExpression: resolveBinaryExpression,
-//     ConditionalExpression : resolveConditionalExpression,
-//     Identifier: resolveIdentifier,
-//     Literal: resolveLiteral,
-//     MemberExpression: resolveMemberExpression,
-//     ThisExpression: resolveThisExpression,
-//     UnaryExpression: resolveUnaryExpression,
-//     UpdateExpression: resolveUpdateExpression,
-//     LogicalExpression: resolveBinaryExpression,
-//     AssignmentExpression: resolveBinaryExpression,
-//     VariableDeclaration: resolveVariableDeclarationExpression};
-// let resolver = typeToResolverMapping[parsedCode.type];
-// return resolver ? resolver.call(undefined, parsedCode) : '';
+
 function resolveForInStatement(parsedForInStatement) {
     const line = parsedForInStatement.loc.start.line;
     const type = 'ForInStatement';
@@ -210,9 +147,7 @@ function resolveElements(parsedCode){
     return resolver ? resolver.call(undefined, parsedCode) : '';
 }
 
-let codeString = '';
-
 function resolveCode(code){
-    codeString = code;
-    return resolveElements(parseCode(code));
+    let parsedCode = parseCode(code);
+    return resolveElements(parsedCode);
 }
