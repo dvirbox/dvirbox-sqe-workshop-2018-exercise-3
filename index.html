@@ -24,6 +24,38 @@
                 font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
                 padding: 8px;
             }
+             #result {
+                 font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+                 border-collapse: collapse;
+                 width: 100%;
+             }
+
+            #result td, #result th {
+                border: 1px solid #ddd;
+                padding: 8px;
+            }
+
+            #result tr:nth-child(even) {
+                background-color: #f2f2f2;
+            }
+
+            #result tr:hover {
+                background-color: #ddd;
+            }
+            #result tr td:nth-child(1),
+            tr td:nth-child(3),
+            tr td:nth-child(4),
+            tr td:nth-child(5)
+            { /* I don't think they are 0 based */
+                text-align: center;
+            }
+            #result th {
+                padding-top: 12px;
+                padding-bottom: 12px;
+                text-align: center;
+                background-color: #008faf;
+                color: white;
+            }
         </style>
     </head>
     <body >
