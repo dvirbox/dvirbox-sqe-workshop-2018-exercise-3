@@ -15,8 +15,7 @@
     "rules": {
         "indent": [
             "error",
-            4,
-            {"SwitchCase": 1}
+            4
         ],
         "quotes": [
             "error",

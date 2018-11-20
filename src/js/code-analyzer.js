@@ -1,153 +1,64 @@
 
 import * as esprima from 'esprima';
-import * as escodegen from 'escodegen';
-
+import {substituteCode, getGlobals, substituteFromEnvironment} from './code-substitution';
+import {evaluateCode} from './code-evaluator';
 export {parseCode, resolveCode};
 
 const parseCode = (codeToParse) => {
     return esprima.parseScript(codeToParse,{ loc: true ,range: true});
 };
 
-function generateResolvedElement(line, type, name='', condition='', value=''){
-    return { line: line, type: type, name: name, condition: condition, value: value };
+function resolveCode(code, args){
+    /** Handle global variables - add global variables to environment**/
+    let environment = {};
+    code = getGlobals(parseCode(code), environment, code);
+
+    /** substitute code - replace and remove all local variables **/
+    const parsedCode = parseCode(code);
+    let initialVector = getInitialVector(parsedCode, args, environment);
+    const  substitutedCode = substituteCode(parsedCode, code, environment, initialVector);
+
+    /** evaluate code - evaluate all expression and paint paths of code by the evaluated result **/
+    const strReducer = (acc, codeRow) => acc + codeRow + '\n';
+    const parsedSubCode = parseCode(substitutedCode.reduce(strReducer, ''));
+    return evaluateCode(parsedSubCode, substitutedCode, initialVector);
 }
 
-function resolveFunction(parsedFunction) {
-    const line = parsedFunction.loc.start.line;
-    const type ='FunctionDeclaration';
-    const name = resolveExpression(parsedFunction.id);
-    const funcDeclaration = generateResolvedElement(line, type, name);
-    const paramRes = resolveParams(parsedFunction.params);
-    const bodyRes = resolveElements(parsedFunction.body);
-    return [].concat(funcDeclaration, paramRes, bodyRes);
-}
-
-function resolveParams(params) {
-    return params.map((param) => {
-        const line = param.loc.start.line;
-        const type = 'VariableDeclaration';
-        const name = resolveExpression(param);
-        return generateResolvedElement(line, type, name);});
-}
-
-function resolveBlockStatement(parsedBlockStatements) {
-    const blockStatements = parsedBlockStatements.body;
-    const reducer = (acc, statement) => acc.concat(resolveElements(statement));
-    return blockStatements.reduce(reducer,[]);
-}
-
-function resolveVariableDeclaration(parsedDeclarations) {
-    const declarations = parsedDeclarations.declarations;
-    return declarations.map((declaration) => {
-        const line = declaration.loc.start.line;
-        const type = 'VariableDeclaration';
-        const name = resolveExpression(declaration.id);
-        const init = declaration.init ? resolveExpression(declaration.init) : '';
-        return generateResolvedElement(line, type, name, undefined, init);});
-}
-
-function resolveAssignmentExpression(parsedAssignmentExpression) {
-    const line = parsedAssignmentExpression.loc.start.line;
-    const type = 'AssignmentExpression';
-    const name = resolveExpression(parsedAssignmentExpression.left);
-    const value = resolveExpression(parsedAssignmentExpression.right);
-    return generateResolvedElement(line, type, name, undefined, value);
-}
-
-function resolveWhileStatement(parsedWhileStatement) {
-    const line = parsedWhileStatement.loc.start.line;
-    const type = 'WhileStatement';
-    const condition = resolveExpression(parsedWhileStatement.test);
-    const whileStatement = generateResolvedElement(line, type, undefined, condition);
-    const body = resolveElements(parsedWhileStatement.body);
-    return [].concat(whileStatement,body);
-}
-
-function resolveIfStatement(parsedIfStatement, isElseIf=false) {
-    const generateIfType = (isElseIf) => isElseIf ? 'ElseIfStatement' : 'IfStatement';
-    const line = parsedIfStatement.loc.start.line;
-    const type = generateIfType(isElseIf);
-    const condition = resolveExpression(parsedIfStatement.test);
-    const ifStatement = generateResolvedElement(line, type, undefined, condition);
-    const body = resolveElements(parsedIfStatement.consequent);
-    if (parsedIfStatement.alternate) { /**if else statements flow**/
-        const alternate = (parsedIfStatement.alternate.type === 'IfStatement') ?
-            resolveIfStatement(parsedIfStatement.alternate, /*isElseIf*/ true) :
-            resolveElements(parsedIfStatement.alternate);
-        return [].concat(ifStatement,body,alternate);
+function getInitialVector(parsedCode, args, environment){
+    let parsedFunc = parsedCode.body[0];
+    args = splitArgs(args);
+    for (let i =0; i < parsedFunc.params.length; i++){
+        const name = parsedFunc.params[i].name;
+        const  parsedArg = parseCode(args[i]).body[0].expression;
+        const value = substituteFromEnvironment(parsedArg, environment);
+        environment[name] = value;
     }
-    return [].concat(ifStatement,body); /**if statement flow**/
+    return  environment;
 }
 
-function resolveReturnStatement(parsedReturnStatement) {
-    const line = parsedReturnStatement.loc.start.line;
-    const value = resolveExpression(parsedReturnStatement.argument);
-    const type ='ReturnStatement';
-    return generateResolvedElement(line, type, undefined, undefined, value);
+
+function push(result , item) {
+    result.push(item);
+    return '';
+}
+function updateDepth(c, depth){
+    if (c === '[')
+        depth++;
+    else if (c === ']')
+        depth--;
+    return depth;
 }
 
-function resolveProgram(parsedProgram){
-    return resolveElements(parsedProgram.body[0]);
-}
-
-function resolveExpressionStatement(parsedExpressionStatement){
-    return resolveElements(parsedExpressionStatement.expression);
-}
-
-function resolveForStatement(parsedForStatement){
-    const line = parsedForStatement.loc.start.line;
-    const type = 'ForStatement';
-    const body = resolveElements(parsedForStatement.body);
-    const init = resolveExpression(parsedForStatement.init);
-    const test = resolveExpression(parsedForStatement.test);
-    const update = resolveExpression(parsedForStatement.update);
-    const condition = init + '; '+ test + '; ' + update;
-    const forStatement = generateResolvedElement(line, type, undefined, condition);
-    return [].concat(forStatement, body);
-}
-
-function resolveUpdateExpression(parsedUpdateExpression){
-    const line = parsedUpdateExpression.loc.start.line;
-    const type = 'AssignmentExpression';
-    const value = resolveExpression(parsedUpdateExpression);
-    return generateResolvedElement(line, type, undefined, undefined, value);
-}
-
-function resolveExpression(parsedCode){
-    return parsedCode ? escodegen.generate(parsedCode) : '';
-    // return parsedCode ? codeString.substring(parsedCode.range[0],parsedCode.range[1]): '';
-}
-
-function resolveForInStatement(parsedForInStatement) {
-    const line = parsedForInStatement.loc.start.line;
-    const type = 'ForInStatement';
-    const body = resolveElements(parsedForInStatement.body);
-    const left = resolveExpression(parsedForInStatement.left);
-    const right = resolveExpression(parsedForInStatement.right);
-    const condition = left + ' in ' + right;
-    const forStatement = generateResolvedElement(line, type, undefined, condition);
-    return [].concat(forStatement, body);
-}
-
-function resolveElements(parsedCode){
-    const typeToResolverMapping = {
-        Program: resolveProgram,
-        AssignmentExpression: resolveAssignmentExpression,
-        BlockStatement: resolveBlockStatement,
-        ExpressionStatement: resolveExpressionStatement,
-        ForStatement: resolveForStatement,
-        FunctionDeclaration: resolveFunction,
-        IfStatement: resolveIfStatement,
-        ReturnStatement: resolveReturnStatement,
-        UpdateExpression: resolveUpdateExpression,
-        VariableDeclaration: resolveVariableDeclaration,
-        WhileStatement: resolveWhileStatement,
-        ForInStatement: resolveForInStatement };
-    let resolver = typeToResolverMapping[parsedCode.type];
-    return resolver ? resolver.call(undefined, parsedCode) : '';
-}
-
-function resolveCode(code){
-    let parsedCode = parseCode(code);
-    return resolveElements(parsedCode);
+function splitArgs(str) {
+    let result = [], item = '', depth = 0;
+    for (let i = 0, c; c = str[i], i < str.length; i++) {
+        if (!depth && c === ',')
+            item = push(result, item);
+        else {
+            item += c;
+            depth = updateDepth(c, depth);
+        }
+    }
+    push(result, item);
+    return result;
 }
