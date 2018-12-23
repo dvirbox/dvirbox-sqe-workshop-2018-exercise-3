@@ -1,37 +1,26 @@
-
-
 import $ from 'jquery';
-import {resolveCode} from './code-analyzer';
+import {parseCode, generateGraphModules} from './code-analyzer';
+
+import Viz from 'viz.js';
+import {Module, render} from 'viz.js/full.render.js';
 
 $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
         const codeToResolve = $('#codePlaceholder').val();
         const args =  $('#argsPlaceholder').val() ;
-        const resolvedCode = resolveCode(codeToResolve, args); /*This is the module*/
-        const html = handleModules(resolvedCode);
-        document.getElementById('result').innerHTML = html;
+        const parsedCode = parseCode(codeToResolve);
+        const parsedArgs = parseCode(args);
+        const cfgModules = generateGraphModules(parsedCode, parsedArgs); /*This is the module*/
+        const dot = `digraph cfg { forcelabels=true\n ${cfgModules.join('')} }`;
+        const viz = new Viz({Module, render});
+
+        const graphPlaceHolder = document.getElementById('result');
+        viz.renderSVGElement(dot)
+            .then(function (element) {
+                graphPlaceHolder.innerHTML = '';
+                graphPlaceHolder.append(element);
+            });
     });
 });
-
-function handleModules(modules){
-    const reducer = (acc, codeRow) => {
-        return acc.concat(codeRow) + '<br>';
-    };
-    return modules.reduce(reducer, []);
-}
-//
-// function fixRowSpaces(rowStr){
-//     return rowStr.replace(/(\()+\s/g, '(')
-//         .replace(/( \))+\s/g, ')')
-//         .replace(/(\[)+\s/g, '[')
-//         .replace(/( ])+\s/g, ']');
-//     // .replace(/,+\s+/g, ', ');
-//     // return rowStr
-//     //     .replace(/]\s+\[/g, '][') //remove spaces between brackets
-//     //     .replace(/,+\s+/g, ', ') // remove space between elements in array
-//     //     .replace(/\s+\]/g, ']') // remove spaces before close bracket
-//     //     .replace(/\[+?\s+/g, '['); // remove spaces before open bracket
-// }
-
 
 

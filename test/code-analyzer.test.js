@@ -1,8 +1,7 @@
 /* eslint-disable max-lines-per-function */
 
 import assert from 'assert';
-import {parseCode, resolveCode} from '../src/js/code-analyzer';
-
+import {parseCode, generateGraphModules} from '../src/js/code-analyzer';
 
 describe('The javascript parser', () => {
     it('is parsing an empty function correctly', () => {
@@ -13,340 +12,897 @@ describe('The javascript parser', () => {
     });
 });
 
-describe('The resolver', () => {
-    it('is resolving an assignment example 1 incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
+describe('The code-generator', () => {
+    it('is resolving first Example incorrectly - if flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
             '    let a = x + 1;\n' +
             '    let b = a + y;\n' +
             '    let c = 0;\n' +
             '    \n' +
             '    if (b < z) {\n' +
             '        c = c + 5;\n' +
-            '        return x + y + z + c;\n' +
             '    } else if (b < z * 2) {\n' +
             '        c = c + x + 5;\n' +
-            '        return x + y + z + c;\n' +
             '    } else {\n' +
             '        c = c + z + 5;\n' +
-            '        return x + y + z + c;\n' +
             '    }\n' +
-            '}\n';
+            '    \n' +
+            '    return c;\n' +
+            '}');
+        const parsedArgs = parseCode('1,2,9');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' b < z * 2", shape=diamond, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' c = c + z + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n6 [label="-6-\n' +
+            ' c = c + x + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n7 [label="-7-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n5 [label="F"];\n' +
+            'n3 -> n6 [label="T"];\n' +
+            'n4 -> n0 ;\n' +
+            'n5 -> n0 ;\n' +
+            'n6 -> n0 ;\n' +
+            'n0 -> n7 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">    if (x + 1 + y < z) {</span>","        return x + y + z + 0 + 5;","<span style=\\"background-color: #b6ff33\\">    } else if (x + 1 + y < z * 2) {</span>","        return x + y + z + 0 + x + 5;","    } else {","        return x + y + z + 0 + z + 5;","    }","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an error example - not immediate interpreting', () => {
-        let code = 'function foo(x, y, z){    \n' +
-            '    let a = x + 1;    \n' +
-            '    let b = a + y;    \n' +
-            '    let c = 0;    \n' +
-            '    while (c++ < 10) {    \n' +
-            '    a = x * y;    \n' +
-            '    z = a * b * c;    \n' +
-            '    }    \n' +
-            '    return z;    \n' +
-            '}';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){    ","    while (c++ < 10) {    ","    z = (x * y)  * (x + 1 + y)  * (0);    ","    }    ","    return z;    ","}"]'
-        );
-    });
-
-    it('is resolving an assignment example 2 incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            '\tlet a = x + 1;\n' +
-            '\tlet b = a + y;\n' +
-            '\tlet c = 0;\n' +
-            '\n' +
-            '\twhile (a < z) {\n' +
-            '\t\tc = a + b;\n' +
-            '\t\tz = c * 2;\n' +
-            '\t}\n' +
-            '\n' +
-            '\treturn z;\n' +
-            '}';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","\\twhile (x + 1 < z) {","\\t\\tz = (x + 1 + x + 1 + y)  * 2;","\\t}","\\treturn z;","}"]'
-        );
-    });
-
-    it('is resolving an assignment example 4 (coloring) incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            '\tlet a = x + 1;\n' +
-            '\tlet b = a + y;\n' +
-            '\tlet c = 0;\n' +
-            '\n' +
-            '\tif (b < z) {\n' +
-            '\t\tc = c + 5;\n' +
-            '\t\treturn x + y + z + c;\n' +
-            '\t} else if (b < z * 2) {\n' +
-            '\t\tc = c + x + 5;\n' +
-            '\t\treturn x + y + z + c;\n' +
-            '\t} else {\n' +
-            '\t\tc = c + z + 5;\n' +
-            '\t\treturn x + y + z + c;\n' +
-            '\t}\n' +
-            '}\n';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">\\tif (x + 1 + y < z) {</span>","\\t\\treturn x + y + z + 0 + 5;","<span style=\\"background-color: #b6ff33\\">\\t} else if (x + 1 + y < z * 2) {</span>","\\t\\treturn x + y + z + 0 + x + 5;","\\t} else {","\\t\\treturn x + y + z + 0 + z + 5;","\\t}","}"]'
-        );
-    });
-
-    it('is resolving if with brackets and without else incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            '\tlet a = x + 1;\n' +
-            '\tlet b = a + y;\n' +
-            '\tlet c = 0;\n' +
-            '\n' +
-            '\tif (b < z) {\n' +
-            '\t\tc = c + 5;\n' +
-            '\t\treturn x + y + z + c;\n' +
-            '\t}\n' +
-            'return z;\n' +
-            '}\n';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">\\tif (x + 1 + y < z) {</span>","\\t\\treturn x + y + z + 0 + 5;","\\t}","return z;","}"]'
-        );
-    });
-
-    it('is resolving if with brackets and with else incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
+    it('is resolving first Example incorrectly - else if flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
             '    let a = x + 1;\n' +
             '    let b = a + y;\n' +
             '    let c = 0;\n' +
-            '\n' +
+            '    \n' +
             '    if (b < z) {\n' +
             '        c = c + 5;\n' +
-            '        return x + y + z + c;\n' +
+            '    } else if (b < z * 2) {\n' +
+            '        c = c + x + 5;\n' +
+            '    } else {\n' +
+            '        c = c + z + 5;\n' +
             '    }\n' +
-            '    else{\n' +
-            '        return z;\n' +
-            '    }\n' +
-            '}';
+            '    \n' +
+            '    return c;\n' +
+            '}');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' b < z * 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n5 [label="-5-\n' +
+            ' c = c + z + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n6 [label="-6-\n' +
+            ' c = c + x + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n7 [label="-7-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n5 [label="F"];\n' +
+            'n3 -> n6 [label="T"];\n' +
+            'n4 -> n0 ;\n' +
+            'n5 -> n0 ;\n' +
+            'n6 -> n0 ;\n' +
+            'n0 -> n7 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">    if (x + 1 + y < z) {</span>","        return x + y + z + 0 + 5;","    }","    else{","        return z;","    }","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an function with if-elseif without else statement incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            '\tlet a = x + 1;\n' +
-            '\tlet b = a + y;\n' +
-            '\tlet c = 0;\n' +
-            '\n' +
-            '\tif (b < z) {\n' +
-            '\t\tc = c + 5;\n' +
-            '\t\treturn x + y + z + c;\n' +
-            '\t}\n' +
-            'else if(true){\n' +
-            'return z;\n' +
-            '}\n' +
-            '}\n';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">\\tif (x + 1 + y < z) {</span>","\\t\\treturn x + y + z + 0 + 5;","\\t}","<span style=\\"background-color: #b6ff33\\">else if(true){</span>","return z;","}","}"]'
-        );
-    });
-
-    it('is resolving if with brackets and without else without return statement in else incorrectly', () => {
-        let code = 'function foo(x, y, z){    \n' +
-            'let a = x + 1;    \n' +
-            'let b = a + y;    \n' +
-            'let c = 0;    \n' +
-            '\t\n' +
-            'if (b < z) {    \n' +
-            'c += 5;    \n' +
-            'x=-x;    \n' +
-            'return x + y + z + c;    \n' +
-            '}    \n' +
-            '\t\n' +
-            '}';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){    ","<span style=\\"background-color: #b6ff33\\">if (x + 1 + y < z) {    </span>","x=-x;    ","return x + y + z + 5;    ","}    ","}"]'
-        );
-    });
-
-    it('is resolving if without return statement incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
+    it('is resolving first Example incorrectly - else flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
             '    let a = x + 1;\n' +
             '    let b = a + y;\n' +
             '    let c = 0;\n' +
-            '\n' +
+            '    \n' +
             '    if (b < z) {\n' +
-            '        c += 5;\n' +
+            '        c = c + 5;\n' +
+            '    } else if (b < z * 2) {\n' +
+            '        c = c + x + 5;\n' +
+            '    } else {\n' +
+            '        c = c + z + 5;\n' +
+            '    }\n' +
+            '    \n' +
+            '    return c;\n' +
+            '}');
+        const parsedArgs = parseCode('1,2,1');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' b < z * 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n5 [label="-5-\n' +
+            ' c = c + z + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n6 [label="-6-\n' +
+            ' c = c + x + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n7 [label="-7-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n5 [label="F"];\n' +
+            'n3 -> n6 [label="T"];\n' +
+            'n4 -> n0 ;\n' +
+            'n5 -> n0 ;\n' +
+            'n6 -> n0 ;\n' +
+            'n0 -> n7 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if without else incorrectly', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = x + 1;\n' +
+            '    let b = a + y;\n' +
+            '    let c = 0;\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    } \n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n0 [label="F"];\n' +
+            'n2 -> n3 [label="T"];\n' +
+            'n0 -> n4 ;\n' +
+            'n3 -> n0 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else-if without else incorrectly - else if flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = x + 1;\n' +
+            '    let b = a + y;\n' +
+            '    let c = 0;\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    }\n' +
+            '    else if(true){\n' +
+            '        c=1;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' true", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' c = 1", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n6 [label="-6-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 [label="F"];\n' +
+            'n3 -> n5 [label="T"];\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n6 ;\n' +
+            'n5 -> n0 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else-if without else incorrectly - if flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = x + 1;\n' +
+            '    let b = a + y;\n' +
+            '    let c = 0;\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    }\n' +
+            '    else if(true){\n' +
+            '        c=1;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('1,2,9');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' true", shape=diamond, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' c = 1", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n6 [label="-6-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 [label="F"];\n' +
+            'n3 -> n5 [label="T"];\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n6 ;\n' +
+            'n5 -> n0 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else without else incorrectly', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = x + 1;\n' +
+            '    let b = a + y;\n' +
+            '    let c = 0;\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    }\n' +
+            '    else{\n' +
+            '        c=1;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' c = 1", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else without else incorrectly', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = x + 1;\n' +
+            '    let b = a + y;\n' +
+            '    let c = 0;\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    }\n' +
+            '    else{\n' +
+            '        c=1;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' c = 1", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else array incorrectly - if flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = [2,3,4];\n' +
+            '    let b = x[0];\n' +
+            '    let c = a[1];\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    } else {\n' +
+            '        c = c + z + 5;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('[2,3,4],2,9');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = [2, 3, 4];\n' +
+            'let b = x[0];\n' +
+            'let c = a[1];", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' c = c + z + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if with else array incorrectly - else flow', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '    let a = [2,3,4];\n' +
+            '    let b = x[0];\n' +
+            '    let c = a[1];\n' +
+            '    if (b < z) {\n' +
+            '        c = c + 5;\n' +
+            '    } else {\n' +
+            '        c = c + z + 5;\n' +
+            '    }\n' +
+            '    return c;\n' +
+            '}\n');
+        const parsedArgs = parseCode('[9,3,4],2,9');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = [2, 3, 4];\n' +
+            'let b = x[0];\n' +
+            'let c = a[1];", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' b < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' c = c + z + 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = c + 5", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return c;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving while case incorrectly', () => {
+        const parsedCode = parseCode('function foo(x, y, z){\n' +
+            '   let a = x + 1;\n' +
+            '   let b = a + y;\n' +
+            '   let c = 0;\n' +
+            '   \n' +
+            '   while (a < z) {\n' +
+            '       c = a + b;\n' +
+            '       z = c * 2;\n' +
+            '       a++;\n' +
+            '   }\n' +
+            '   \n' +
+            '   return z;\n' +
+            '}\n');
+        const parsedArgs = parseCode('2,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;\n' +
+            'let b = a + y;\n' +
+            'let c = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1000 [label="null", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' a < z", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' return z;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' c = a + b\n' +
+            'z = c * 2\n' +
+            'a++", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n1 -> n1000 ;\n' +
+            'n1000 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n4 -> n1000 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving while with if-else case incorrectly - flow while->true if-> else', () => {
+        const parsedCode = parseCode('function foo(x){    \n' +
+            '\tlet a = x + 1;    \n' +
+            '\twhile (x < a) {    \n' +
+            '\t\tif (x==2){     \n' +
+            '\t\t\tx = a;    \n' +
+            '\t\t}    \n' +
+            '\t\telse {    \n' +
+            '\t\t\tx = x+1;    \n' +
+            '\t\t}    \n' +
+            '\t}    \t\n' +
+            '\treturn a;    \n' +
+            '}');
+        const parsedArgs = parseCode('1');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1000 [label="null", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x < a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' return a;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' x == 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' x = x + 1", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n6 [label="-6-\n' +
+            ' x = a", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n1 -> n1000 ;\n' +
+            'n1000 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n4 -> n5 [label="F"];\n' +
+            'n4 -> n6 [label="T"];\n' +
+            'n5 -> n1000 ;\n' +
+            'n6 -> n1000 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving while with if-else case incorrectly - flow while->true if-> if', () => {
+        const parsedCode = parseCode('function foo(x){    \n' +
+            '\tlet a = x + 1;    \n' +
+            '\twhile (x < a) {    \n' +
+            '\t\tif (x==2){     \n' +
+            '\t\t\tx = a;    \n' +
+            '\t\t}    \n' +
+            '\t\telse {    \n' +
+            '\t\t\tx = x+1;    \n' +
+            '\t\t}    \n' +
+            '\t}    \t\n' +
+            '\treturn a;    \n' +
+            '}');
+        const parsedArgs = parseCode('2');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1000 [label="null", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x < a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' return a;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' x == 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' x = x + 1", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n6 [label="-6-\n' +
+            ' x = a", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n1000 ;\n' +
+            'n1000 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n4 -> n5 [label="F"];\n' +
+            'n4 -> n6 [label="T"];\n' +
+            'n5 -> n1000 ;\n' +
+            'n6 -> n1000 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving while with if-else case incorrectly - flow while->false', () => {
+        const parsedCode = parseCode('function foo(x){    \n' +
+            '\tlet a = x + 1;    \n' +
+            '\twhile (x < a) {    \n' +
+            '\t\tif (x==2){     \n' +
+            '\t\t\tx = a;    \n' +
+            '\t\t}    \n' +
+            '\t\telse {    \n' +
+            '\t\t\tx = x+1;    \n' +
+            '\t\t}    \n' +
+            '\t}    \t\n' +
+            '\treturn a;    \n' +
+            '}');
+        const parsedArgs = parseCode('2');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = x + 1;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1000 [label="null", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x < a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' return a;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' x == 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' x = x + 1", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n6 [label="-6-\n' +
+            ' x = a", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n1000 ;\n' +
+            'n1000 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n4 -> n5 [label="F"];\n' +
+            'n4 -> n6 [label="T"];\n' +
+            'n5 -> n1000 ;\n' +
+            'n6 -> n1000 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
+        );
+    });
+
+    it('is resolving strings incorrectly - flow if', () => {
+        const parsedCode = parseCode('function foo(x){\n' +
+            '    let a = \'hi\';\n' +
+            '    if (x === a){\n' +
+            '        x = a +\'1\';\n' +
             '    }\n' +
             '    else {\n' +
-            '        return 3;\n' +
+            '        x = \'ih\';\n' +
             '    }\n' +
-            '}';
+            '    return x;\n' +
+            '}');
+        const parsedArgs = parseCode('\'hi\'');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = \'hi\';", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x === a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' x = \'ih\'", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' x = a + \'1\'", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return x;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #ff5733\\">    if (x + 1 + y < z) {</span>","    }","    else {","        return 3;","    }","}"]'
+            result,
+            expected
         );
     });
 
-
-    it('is resolving void function with single return incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            'return;\n' +
-            '}\n';
+    it('is resolving strings incorrectly - flow else', () => {
+        const parsedCode = parseCode('function foo(x){\n' +
+            '    let a = \'hi\';\n' +
+            '    if (x === a){\n' +
+            '        x = a +\'1\';\n' +
+            '    }\n' +
+            '    else {\n' +
+            '        x = \'ih\';\n' +
+            '    }\n' +
+            '    return x;\n' +
+            '}');
+        const parsedArgs = parseCode('\'hii\'');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = \'hi\';", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x === a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' x = \'ih\'", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' x = a + \'1\'", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return x;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n0 ;\n' +
+            'n4 -> n0 ;\n' +
+            'n0 -> n5 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","return;","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving void function with if with return without else incorrectly', () => {
-        let code = 'function foo(x, y, z){\n' +
-            'if(x){\n' +
-            'return;\n' +
-            '}\n' +
-            '}\n';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){","<span style=\\"background-color: #b6ff33\\">if(x){</span>","return;","}","}"]'
-        );
-    });
-
-    it('is resolving an function with if (without brackets) without else statement incorrectly', () => {
-        let code = 'function binarySearch(X, V, n){\n' +
-            '    let mid = 0;\n' +
-            '    if (X < V[mid])\n' +
-            '        return high = mid - 1;\n' +
-            '}';
-        assert.equal(
-            JSON.stringify(resolveCode(code, '1,[2],3')),
-            '["function binarySearch(X, V, n){","<span style=\\"background-color: #b6ff33\\">    if (X < V[0])</span>","        return high = 0 - 1;","}"]'
-        );
-    });
-
-    it('is resolving an function with global variables before and after', () => {
-        let code = 'let d = 3;    \n' +
-            'function foo(x, y, z){    \n' +
-            '\tlet a = x + 1;    \n' +
-            '\tlet b = a + y;    \n' +
-            '\tlet c = 0;    \n' +
-            '\t\n' +
-            '\tif (b < z) {    \n' +
-            '\t\tc = c + 5;    \n' +
-            '\t\treturn x + y + z + c;    \n' +
-            '\t} else if (b < z * 2) {    \n' +
-            '\t\tc = c + x + 5;    \n' +
-            '\t\treturn x + y + z + c +d+w;    \n' +
-            '\t} else {    \n' +
-            '\t\tc = c + z + 5;    \n' +
-            '\t\treturn x + y + z + c;    \n' +
+    it('is resolving multi returns incorrectly', () => {
+        const parsedCode = parseCode('function foo(x){    \n' +
+            '\tlet a = \'hi\';    \n' +
+            '\tif (x === a){     \n' +
+            '\t    return a +\'1\';    \n' +
             '\t}    \n' +
-            '}    \n' +
-            'let w = 8;';
+            '\telse {    \n' +
+            '\t    return \'ih\';    \n' +
+            '\t}  \n' +
+            '}');
+        const parsedArgs = parseCode('\'hi\'');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = \'hi\';", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' x === a", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' return \'ih\';", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n4 [label="-4-\n' +
+            ' return a + \'1\';", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            'n2 -> n3 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,2,3')),
-            '["function foo(x, y, z){    ","<span style=\\"background-color: #ff5733\\">\\tif (x + 1 + y < z) {    </span>","\\t\\treturn x + y + z + 0 + 5;    ","<span style=\\"background-color: #b6ff33\\">\\t} else if (x + 1 + y < z * 2) {    </span>","\\t\\treturn x + y + z + 0 + x + 5 + d + w;    ","\\t} else {    ","\\t\\treturn x + y + z + 0 + z + 5;    ","\\t}    ","}    "]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an with local array variable incorrectly', () => {
-        let code = 'function binarySearch(X, V, n){\n' +
-            '    let c = [1,2,3]\n' +
-            '    let mid = 0;\n' +
-            '    if (X < V[mid])\n' +
-            '        return high = mid - 1 + c[0];\n' +
-            '}';
+    it('is resolving member expr', () => {
+        const parsedCode = parseCode('function foo(x,y){    \n' +
+            '\treturn x[0] === y[1];\n' +
+            '}');
+        const parsedArgs = parseCode('[1],[2,1]');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' return x[0] === y[1];", shape=rectangle, style = filled, fillcolor = green];\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,[2],3')),
-            '["function binarySearch(X, V, n){","<span style=\\"background-color: #b6ff33\\">    if (X < V[0])</span>","        return high = 0 - 1 + [1,2,3][0];","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an with global array variable incorrectly', () => {
-        let code = 'let c = [6,2,3]    \n' +
-            'function binarySearch(X, V, n){    \n' +
-            '\tlet mid = 0;    \n' +
-            '\tif (X < V[mid])    \n' +
-            '\t\treturn high = mid - 1 + c[0];    \n' +
-            '}';
+    it('is resolving member expr assignment', () => {
+        const parsedCode = parseCode('function foo(x,y){  \n' +
+            'x[0] = y[1]  \n' +
+            '\treturn x;\n' +
+            '}');
+        const parsedArgs = parseCode('[1],[2,1]');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' x[0] = y[1]", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' return x;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,[2],3')),
-            '["function binarySearch(X, V, n){    ","<span style=\\"background-color: #b6ff33\\">\\tif (X < V[0])    </span>","\\t\\treturn high = 0 - 1 + c[0];    ","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an uninitialized local incorrectly', () => {
-        let code = 'let c = [6,2,3]    \n' +
-            'function binarySearch(X, V, n){    \n' +
-            '\tlet mid;    \n' +
-            '\tmid = 0;    \n' +
-            '\tif (X < V[mid])    \n' +
-            '\t\treturn high = mid - 1 + c[0];    \n' +
-            '}';
+    it('is array object expr', () => {
+        const parsedCode = parseCode('function foo(x,y){  \n' +
+            'x[0] = [0,1,2][0];  \n' +
+            '\treturn x;\n' +
+            '}');
+        const parsedArgs = parseCode('[1],[2,1]');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' x[0] = [0, 1, 2][0]", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' return x;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,[2],3')),
-            '["function binarySearch(X, V, n){    ","<span style=\\"background-color: #b6ff33\\">\\tif (X < V[0])    </span>","\\t\\treturn high = 0 - 1 + c[0];    ","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an uninitialized local incorrectly', () => {
-        let code = 'function binarySearch(X, V, n){    \n' +
-            'let c = [0,2,[0]]       \n' +
-            '\tlet mid = 0;        \n' +
-            '\tif (X < c[0] +  [1,2][0] + c[2][0])        \n' +
-            '\t\treturn high = mid - 1 + c[2][0];        \n' +
-            '}';
+    it('is resolving updateExpr incorrectly', () => {
+        const parsedCode = parseCode('function foo(x,y){  \n' +
+            'x[0] = [0,1,2][0];\n' +
+            'y++;  \n' +
+            '\treturn x;\n' +
+            '}');
+        const parsedArgs = parseCode('[1],1');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' x[0] = [0, 1, 2][0]\n' +
+            'y++", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' return x;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '1,[2],3')),
-            '["function binarySearch(X, V, n){    ","<span style=\\"background-color: #ff5733\\">\\tif (X < [0,2,[0]][0] +[1,2][0] + [0,2,[0]][2][0])        </span>","\\t\\treturn high = 0 - 1 + [0,2,[0]][2][0];        ","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving an uninitialized local incorrectly', () => {
-        let code = 'function binarySearch(x, y, z){\n' +
-            'let c = \'Dvir\';\n' +
-            'let d = \'dvir\'; \n' +
-            '    if(c === z){\n' +
-            '        return [1,2,3,4];\n' +
-            '    }\n' +
-            '    if(d === z){\n' +
-            '        return [1,2,3,c];\n' +
-            '    }          \n' +
-            '    if(y){\n' +
-            '        return [y,c,x,d];\n' +
-            '    }\n' +
-            '    if(x){\n' +
-            '        return 4;\n' +
-            '    }\n' +
-            '    if(0){\n' +
-            '        return 5;\n' +
-            '    }\n' +
-            '}';
+    it('is resolving arrayLabel incorrectly', () => {
+        const parsedCode = parseCode('function a(x){\n' +
+            'let a =0;\n' +
+            'return 0;\n' +
+            '}');
+        const parsedArgs = parseCode('1');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' let a = 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' return 0;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, 'undefined,false,\'Dvir\'')),
-            '["function binarySearch(x, y, z){","<span style=\\"background-color: #b6ff33\\">    if(\\"Dvir\\" === z){</span>","        return [1,2,3,4];","    }","<span style=\\"background-color: #ff5733\\">    if(\\"dvir\\" === z){</span>","        return [1,2,3,\\"Dvir\\"];","    }          ","<span style=\\"background-color: #ff5733\\">    if(y){</span>","        return [y,\\"Dvir\\",x,\\"dvir\\"];","    }","<span style=\\"background-color: #ff5733\\">    if(x){</span>","        return 4;","    }","<span style=\\"background-color: #ff5733\\">    if(0){</span>","        return 5;","    }","}"]'
+            result,
+            expected
         );
     });
 
-    it('is resolving array stuff incorreclty', () => {
-        let code = 'function foo(x, y, z){\n' +
-            '    let c=[1,2,3];\n' +
-            '    c = x;\n' +
-            '    c[0] = 6;    \n' +
-            '    x[0]=-x[0];\n' +
-            '    if(y === 2){\n' +
-            '        return 4;\n' +
-            '    }    \n' +
-            '    if(x[0] === -1){\n' +
-            '        return x + y + z + c;    \n' +
-            '    }    \n' +
-            '}';
+    it('is resolving if going to return statement on false flow', () => {
+        const parsedCode = parseCode('function goo(x,y,z){\n' +
+            'if(x>y){\n' +
+            'x=x+1;\n' +
+            '}\n' +
+            'if(y>x){\n' +
+            'y=y+1;\n' +
+            '}\n' +
+            'return z;\n' +
+            '}');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' x > y", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' y > x", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' x = x + 1", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' y = y + 1", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return z;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n1 -> n2 [label="F"];\n' +
+            'n1 -> n3 [label="T"];\n' +
+            'n2 -> n0 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n2 ;\n' +
+            'n0 -> n5 ;\n' +
+            'n4 -> n0 ;\n' +
+            '';
         assert.equal(
-            JSON.stringify(resolveCode(code, '[1,2,3],2,3')),
-            '["function foo(x, y, z){","    x[0]=-x[0];","<span style=\\"background-color: #b6ff33\\">    if(y === 2){</span>","        return 4;","    }    ","<span style=\\"background-color: #b6ff33\\">    if(x[0] === -1){</span>","        return x + y + z + x;    ","    }    ","}"]'
+            result,
+            expected
+        );
+    });
+
+    it('is resolving if going to return statement on false flow', () => {
+        const parsedCode = parseCode('function goo(x,y,z){\n' +
+            'if(x>y){\n' +
+            'x=x+1;\n' +
+            '}\n' +
+            'if(y>x){\n' +
+            'if(1===2){\n' +
+            'return z;\n' +
+            '}\n' +
+            'z=5\n' +
+            '}\n' +
+            'return z;\n' +
+            '}');
+        const parsedArgs = parseCode('1,2,3');
+        const result = generateGraphModules(parsedCode, parsedArgs).join('');
+        const expected = 'n1 [label="-1-\n' +
+            ' x > y", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n2 [label="-2-\n' +
+            ' y > x", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n3 [label="-3-\n' +
+            ' x = x + 1", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n0 [label="", shape=circle, style = filled, fillcolor = green];\n' +
+            'n4 [label="-4-\n' +
+            ' 1 === 2", shape=diamond, style = filled, fillcolor = green];\n' +
+            'n5 [label="-5-\n' +
+            ' return z;", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n6 [label="-6-\n' +
+            ' z = 5", shape=rectangle, style = filled, fillcolor = green];\n' +
+            'n7 [label="-7-\n' +
+            ' return z;", shape=rectangle, style = filled, fillcolor = white];\n' +
+            'n1 -> n2 [label="F"];\n' +
+            'n1 -> n3 [label="T"];\n' +
+            'n2 -> n0 [label="F"];\n' +
+            'n2 -> n4 [label="T"];\n' +
+            'n3 -> n2 ;\n' +
+            'n0 -> n5 ;\n' +
+            'n4 -> n6 [label="F"];\n' +
+            'n4 -> n7 [label="T"];\n' +
+            'n6 -> n0 ;\n' +
+            '';
+        assert.equal(
+            result,
+            expected
         );
     });
 });
+
+
+
